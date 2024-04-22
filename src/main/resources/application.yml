@@ -1,0 +1,8 @@
+spring:
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+
+knife4j:
+  # 是否开启swagger
+  enable: true
