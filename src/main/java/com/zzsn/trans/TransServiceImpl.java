@@ -88,6 +88,7 @@ public class TransServiceImpl implements TransService {
                 deleteFiles(tempFileList);
                 FileUtil.appendString(StrUtil.format("{}  文件：{}，转换成功，耗时：{}\n\n", DateUtil.now(), one.getName(), timer.intervalPretty()), logFile, Charset.defaultCharset());
                 log.info("文件：{}，转换成功，耗时：{}", one.getName(), timer.intervalPretty());
+                timer.restart();
             }
 
 
