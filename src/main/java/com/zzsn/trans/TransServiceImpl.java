@@ -2,8 +2,10 @@ package com.zzsn.trans;
 
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.date.TimeInterval;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.lang.Assert;
+import cn.hutool.core.util.StrUtil;
 import com.pdftron.pdf.Convert;
 import com.pdftron.pdf.PDFDoc;
 import com.pdftron.pdf.PDFNet;
@@ -32,6 +34,7 @@ public class TransServiceImpl implements TransService {
 
     @Override
     public ResultVo<Void> transFromLocal(String localPath) {
+        TimeInterval timer = new TimeInterval();
         File output;
         File logFile = null;
         try {
@@ -61,7 +64,8 @@ public class TransServiceImpl implements TransService {
                 }
 
                 log.info("开始转换文件：{}", one.getName());
-                FileUtil.appendString(DateUtil.now() + "  文件：" + one.getName() + "，开始转换\n", logFile, Charset.defaultCharset());
+                timer.start();
+                FileUtil.appendString(DateUtil.now() + "  开始转换文件：" + one.getName() + "\n", logFile, Charset.defaultCharset());
                 String sourcePath = one.getAbsolutePath();
 
                 final int pageCount;
@@ -84,8 +88,8 @@ public class TransServiceImpl implements TransService {
                 log.info("开始合并文件：{}", one.getName());
                 mergeWordFiles(tempFileList, FileUtil.file(output, fileNameWithoutExt + ".docx"));
                 deleteFiles(tempFileList);
-                FileUtil.appendString(DateUtil.now() + "  文件：" + one.getName() + "，转换成功\n", logFile, Charset.defaultCharset());
-                log.info("文件：{}，转换成功", one.getName());
+                FileUtil.appendString(StrUtil.format("{}  文件：{}，转换成功，耗时：{}\n\n", DateUtil.now(), one.getName(), timer.intervalPretty()), logFile, Charset.defaultCharset());
+                log.info("文件：{}，转换成功，耗时：{}", one.getName(), timer.intervalPretty());
             }
 
 
