@@ -7,6 +7,18 @@ knife4j:
   # 是否开启swagger
   enable: true
 
+thread:
+  prefix: "trans-thread-"
+  core:
+    # 核心线程数
+    size: 16
+  max:
+    # 最大线程数
+    size: 32
+  queue:
+    # 队列大小
+    size: 30
+
 apryse:
   # license内容
   license: "改成自己的"

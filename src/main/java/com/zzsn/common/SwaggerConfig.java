@@ -22,6 +22,6 @@ public class SwaggerConfig {
 
     @Bean
     public Docket createRestApi(ApiInfo apiInfo) {
-        return new Docket(DocumentationType.OAS_30).apiInfo(apiInfo).groupName("").select().apis(RequestHandlerSelectors.withClassAnnotation(RestController.class)).paths(PathSelectors.any()).build();
+        return new Docket(DocumentationType.OAS_30).apiInfo(apiInfo).groupName("test").select().apis(RequestHandlerSelectors.withClassAnnotation(RestController.class)).paths(PathSelectors.any()).build();
     }
 }

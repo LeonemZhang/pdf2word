@@ -1,7 +1,13 @@
 package com.zzsn.trans;
 
-import com.zzsn.common.ResultVo;
+import java.io.File;
 
 public interface TransService {
-    ResultVo<Void> transFromLocal(String localPath);
+    /**
+     * 转换传入的pdf文件列表，方法内不会校验文件是否合法，请在调用前自行校验
+     *
+     * @param fileList   pdf文件列表
+     * @param outputPath 输出路径
+     */
+    void transPdfList(File[] fileList, String outputPath);
 }

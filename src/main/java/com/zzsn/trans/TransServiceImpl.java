@@ -1,105 +1,72 @@
 package com.zzsn.trans;
 
-import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.date.TimeInterval;
 import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.pdftron.pdf.Convert;
 import com.pdftron.pdf.PDFDoc;
-import com.pdftron.pdf.PDFNet;
-import com.pdftron.pdf.StructuredOutputModule;
 import com.spire.doc.Document;
 import com.spire.doc.FileFormat;
-import com.zzsn.common.ResultVo;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
 import java.io.File;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 @Service
 @Slf4j
 public class TransServiceImpl implements TransService {
-    @Value("${apryse.license}")
-    private String apryseLicense;
-
-    @Value("${apryse.libPath}")
-    private String apryseLibPath;
+    @Resource(name = "threadPoolTaskExecutor")
+    private ThreadPoolTaskExecutor threadPool;
 
     @Override
-    public ResultVo<Void> transFromLocal(String localPath) {
+    public void transPdfList(File[] fileList, String outputPath) {
         final TimeInterval timer = new TimeInterval();
+        final File logFile = FileUtil.touch(FileUtil.file(outputPath, "任务日志.txt"));
 
-        final File output = FileUtil.file(localPath, DateUtil.format(DateUtil.date(), "yyyy-MM-dd_HH-mm-ss"));
-        FileUtil.mkdir(output);
-        final File logFile = FileUtil.touch(FileUtil.file(output, "任务日志.txt"));
+        threadPool.submit(() -> {
+            try {
+                for (final File one : fileList) {
+                    timer.start();
+                    log.info("开始转换文件：{}", one.getName());
+                    FileUtil.appendString(DateUtil.now() + "  开始转换文件：" + one.getName() + "\n", logFile, Charset.defaultCharset());
+                    final String sourceFileAbsPath = one.getAbsolutePath();
+                    final String fileNameWithoutExt = one.getName().replace(".pdf", "");
 
-        try {
-            final File file = new File(localPath);
-            Assert.isTrue(file.exists(), "目录不存在");
-            final File[] files = file.listFiles();
-            Assert.notNull(files, "目录下不存在文件");
-            Assert.isTrue(CollectionUtil.isNotEmpty(Arrays.asList(files)), "目录下不存在文件");
+                    final int pageCount;
+                    try (PDFDoc doc = new PDFDoc(sourceFileAbsPath)) {
+                        pageCount = doc.getPageCount();
+                    }
 
-            PDFNet.initialize(apryseLicense);
-            PDFNet.addResourceSearchPath(apryseLibPath);
+                    int batchNum = 1;
+                    List<File> tempFileList = new ArrayList<>();
+                    for (int i = 1; i <= pageCount; i += 6) {
+                        final File tempOutputFile = FileUtil.file(outputPath, StrUtil.format("{}_{}.docx", fileNameWithoutExt, batchNum++));
+                        Convert.WordOutputOptions options = new Convert.WordOutputOptions();
+                        options.setPages(i, Math.min(i + 5, pageCount));
+                        Convert.toWord(sourceFileAbsPath, tempOutputFile.getAbsolutePath(), options);
+                        tempFileList.add(tempOutputFile);
+                        log.info("文件:{}，第{}页到第{}页转换成功", one.getName(), i, Math.min(i + 5, pageCount));
+                    }
 
-            if (!StructuredOutputModule.isModuleAvailable()) {
-                throw new Exception("pdf转换word模块不可用");
+                    log.info("开始合并文件：{}", one.getName());
+                    mergeWordFiles(tempFileList, FileUtil.file(outputPath, fileNameWithoutExt + ".docx"));
+                    deleteFiles(tempFileList);
+                    FileUtil.appendString(StrUtil.format("{}  文件：{}，转换成功，耗时：{}\n\n", DateUtil.now(), one.getName(), timer.intervalPretty()), logFile, Charset.defaultCharset());
+                    log.info("文件：{}，转换成功，耗时：{}", one.getName(), timer.intervalPretty());
+                }
+                log.info("全部文件转换完成，任务结束");
+                FileUtil.appendString("全部文件转换完成，任务结束\n", logFile, Charset.defaultCharset());
+            } catch (Exception e) {
+                log.error("转换失败：", e);
+                FileUtil.appendString("转换失败：" + e.getMessage() + "\n", logFile, Charset.defaultCharset());
             }
-
-            for (final File one : files) {
-                if (one.isDirectory() || !FileUtil.getType(one).equals("pdf")) {
-                    FileUtil.appendString(DateUtil.now() + "  文件:" + one.getName() + "，不是pdf文件，已跳过转换\n", logFile, Charset.defaultCharset());
-                    log.warn("文件:{}，不是pdf文件，已跳过处理该文件", one.getName());
-                    continue;
-                }
-
-                timer.start();
-                log.info("开始转换文件：{}", one.getName());
-                FileUtil.appendString(DateUtil.now() + "  开始转换文件：" + one.getName() + "\n", logFile, Charset.defaultCharset());
-                final String sourceFileAbsPath = one.getAbsolutePath();
-                final String fileNameWithoutExt = one.getName().replace(".pdf", "");
-
-                final int pageCount;
-                try (PDFDoc doc = new PDFDoc(sourceFileAbsPath)) {
-                    pageCount = doc.getPageCount();
-                }
-
-                int batchNum = 1;
-                List<File> tempFileList = new ArrayList<>();
-                for (int i = 1; i <= pageCount; i += 6) {
-                    final File tempOutputFile = FileUtil.file(output, StrUtil.format("{}_{}.docx", fileNameWithoutExt, batchNum++));
-                    Convert.WordOutputOptions options = new Convert.WordOutputOptions();
-                    options.setPages(i, Math.min(i + 5, pageCount));
-                    Convert.toWord(sourceFileAbsPath, tempOutputFile.getAbsolutePath(), options);
-                    tempFileList.add(tempOutputFile);
-                    log.info("文件:{}，第{}页到第{}页转换成功", one.getName(), i, Math.min(i + 5, pageCount));
-                }
-
-                log.info("开始合并文件：{}", one.getName());
-                mergeWordFiles(tempFileList, FileUtil.file(output, fileNameWithoutExt + ".docx"));
-                deleteFiles(tempFileList);
-                FileUtil.appendString(StrUtil.format("{}  文件：{}，转换成功，耗时：{}\n\n", DateUtil.now(), one.getName(), timer.intervalPretty()), logFile, Charset.defaultCharset());
-                log.info("文件：{}，转换成功，耗时：{}", one.getName(), timer.intervalPretty());
-                timer.restart();
-            }
-
-
-        } catch (Exception e) {
-            log.error("转换失败：", e);
-            FileUtil.appendString("转换失败：" + e.getMessage() + "\n", logFile, Charset.defaultCharset());
-            return ResultVo.ofFailure(e.getMessage());
-        }
-
-        PDFNet.terminate();
-        return ResultVo.ofSuccessMsg("转换成功，输出目录为：" + output.getAbsolutePath());
+        });
     }
 
     /**

@@ -8,8 +8,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 @Slf4j
 public class GlobalExceptionHandler {
     @ExceptionHandler
-    public String handleException(Exception e) {
+    public ResultVo<Void> handleException(Exception e) {
         log.error("捕获到异常：", e);
-        return e.getMessage();
+        return ResultVo.ofFailure(e.getMessage());
     }
 }

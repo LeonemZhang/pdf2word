@@ -17,7 +17,7 @@
     <dependencies>
         <!--pdf转换成docx-->
         <dependency>
-            <groupId>com.pdftron</groupId>
+            <groupId>com.zzsn</groupId>
             <artifactId>PDFNet</artifactId>
             <version>10.8.0</version>
             <scope>system</scope>
