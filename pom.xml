@@ -20,12 +20,16 @@
             <groupId>com.pdftron</groupId>
             <artifactId>PDFNet</artifactId>
             <version>10.8.0</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/PDFNet-10.8.0.jar</systemPath>
         </dependency>
         <!--合并多个docx文件-->
         <dependency>
             <groupId>e-iceblue</groupId>
             <artifactId>spire.doc</artifactId>
             <version>1.0.0</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/Spire.Doc.jar</systemPath>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
