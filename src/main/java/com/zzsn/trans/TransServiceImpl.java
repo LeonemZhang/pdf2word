@@ -1,4 +1,4 @@
-package com.zzsn.controller;
+package com.zzsn.trans;
 
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.date.DateUtil;
@@ -10,12 +10,10 @@ import com.pdftron.pdf.PDFNet;
 import com.pdftron.pdf.StructuredOutputModule;
 import com.spire.doc.Document;
 import com.spire.doc.FileFormat;
-import io.swagger.v3.oas.annotations.Operation;
+import com.zzsn.common.ResultVo;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.nio.charset.Charset;
@@ -23,40 +21,37 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/**
- * @author 张宗涵
- * @date 2024/4/20
- */
-@RestController
-@RequestMapping("/test")
+@Service
 @Slf4j
-public class Controller {
-    @GetMapping("/hello")
-    public String hello() {
-        return "hello";
-    }
+public class TransServiceImpl implements TransService {
+    @Value("${apryse.license}")
+    private String apryseLicense;
 
-    @Operation(summary = "path", description = "传入从/share开始的目录路径，如/share/xx公司/2020年报告")
-    @GetMapping("/upload")
-    public Object path(@RequestParam("path") String path) {
-        File file = new File(path);
-        Assert.isTrue(file.exists(), "目录不存在");
-        final File[] files = file.listFiles();
-        Assert.notNull(files, "目录下不存在文件");
-        Assert.isTrue(CollectionUtil.isNotEmpty(Arrays.asList(files)), "目录下不存在文件");
+    @Value("${apryse.libPath}")
+    private String apryseLibPath;
 
-        final File output = FileUtil.file(path, DateUtil.format(DateUtil.date(), "yyyy-MM-dd_HH-mm-ss"));
-        FileUtil.mkdir(output);
-        final File logFile = FileUtil.touch(FileUtil.file(output, "任务日志.txt"));
-
-        PDFNet.initialize("demo:leonemzhang@gmail.com:7fea6f0e0200000000c32149cb880899b8eb151cb3cdf2c10567ca11bb");
-        PDFNet.addResourceSearchPath("C:\\Users\\EDY\\code space\\pdf2word\\src\\main\\resources\\lib");
-
+    @Override
+    public ResultVo<Void> transFromLocal(String localPath) {
+        File output;
+        File logFile = null;
         try {
+            output = FileUtil.file(localPath, DateUtil.format(DateUtil.date(), "yyyy-MM-dd_HH-mm-ss"));
+            FileUtil.mkdir(output);
+            logFile = FileUtil.touch(FileUtil.file(output, "任务日志.txt"));
+
+            File file = new File(localPath);
+            Assert.isTrue(file.exists(), "目录不存在");
+            final File[] files = file.listFiles();
+            Assert.notNull(files, "目录下不存在文件");
+            Assert.isTrue(CollectionUtil.isNotEmpty(Arrays.asList(files)), "目录下不存在文件");
+
+            PDFNet.initialize(apryseLicense);
+            PDFNet.addResourceSearchPath(apryseLibPath);
+
             if (!StructuredOutputModule.isModuleAvailable()) {
                 FileUtil.appendString("pdf转换word模块不可用，任务失败", logFile, Charset.defaultCharset());
                 log.error("pdf转换word模块不可用");
-                return "pdf转换word模块不可用";
+                return ResultVo.ofFailure("pdf转换word模块不可用");
             }
             for (final File one : files) {
                 if (one.isDirectory() || !FileUtil.getType(one).equals("pdf")) {
@@ -97,24 +92,34 @@ public class Controller {
         } catch (Exception e) {
             log.error("转换失败：", e);
             FileUtil.appendString("转换失败：" + e.getMessage() + "\n", logFile, Charset.defaultCharset());
-            return e.getMessage();
+            return ResultVo.ofFailure(e.getMessage());
         }
 
         PDFNet.terminate();
-        return output.getAbsolutePath();
+        return ResultVo.ofSuccessMsg("转换成功，输出目录为：" + output.getAbsolutePath());
     }
 
-
-    public void mergeWordFiles(List<File> files, File outputFile) {
+    /**
+     * 用spire.doc库合并word文件
+     *
+     * @param files      需要合并的文件列表
+     * @param outputFile 合并后的文件
+     */
+    private void mergeWordFiles(List<File> files, File outputFile) {
         final File headFile = files.get(0);
-        Document document = new Document(headFile.getAbsolutePath());
+        Document deadDocument = new Document(headFile.getAbsolutePath());
 
         for (int i = 1; i < files.size(); i++) {
-            document.insertTextFromFile(files.get(i).getAbsolutePath(), FileFormat.Docx);
+            deadDocument.insertTextFromFile(files.get(i).getAbsolutePath(), FileFormat.Docx);
         }
-        document.saveToFile(outputFile.getAbsolutePath(), FileFormat.Docx);
+        deadDocument.saveToFile(outputFile.getAbsolutePath(), FileFormat.Docx);
     }
 
+    /**
+     * 删除临时文件
+     *
+     * @param tempFileList 临时文件列表
+     */
     private void deleteFiles(List<File> tempFileList) {
         for (File file : tempFileList) {
             FileUtil.del(file);
